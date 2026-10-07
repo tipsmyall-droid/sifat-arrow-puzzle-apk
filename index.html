@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Sifat Arrow Puzzle</title>
+<style>
+  body{margin:0;background:#0f172a;color:white;font-family:sans-serif;overflow:hidden;text-align:center}
+  #top{padding:12px;background:#1e293b;display:flex;justify-content:space-between;align-items:center}
+  #level{font-weight:bold;font-size:18px}
+  #canvas{width:100vw;height:75vh;background:#1e293b;display:block;touch-action:none}
+  #msg{font-size:20px;margin-top:10px;color:#22c55e}
+  button{background:#22c55e;color:#000;border:0;padding:10px 20px;border-radius:12px;font-weight:bold;font-size:16px;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="top">
+  <div id="level">Level 1</div>
+  <div>🏹 Sifat Arrow Puzzle</div>
+  <div id="moves">Moves: 0</div>
+</div>
+<canvas id="canvas"></canvas>
+<div id="msg">তীরগুলো ঘোরাও যাতে একটার সাথে আরেকটা না লাগে!</div>
+<button onclick="nextLevel()">Next Level ▶</button>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W,H, arrows=[], moves=0, level=1;
+
+function resize(){
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight * 0.75;
+}
+window.addEventListener('resize', resize); resize();
+
+function createLevel(lv){
+  arrows=[]; moves=0;
+  document.getElementById('level').innerText = "Level "+lv;
+  document.getElementById('moves').innerText = "Moves: 0";
+  document.getElementById('msg').innerText = "তীরগুলো ঘোরাও যাতে না লাগে!";
+  let count = 3 + Math.floor(lv/2); // Level বাড়লে তীর বাড়বে
+  if(count>10) count=10;
+  for(let i=0;i<count;i++){
+    let ang = Math.random()*360;
+    let r = 40 + Math.random()* (Math.min(W,H)/3);
+    let cx = W/2 + Math.cos(i/count*2*Math.PI)*r;
+    let cy = H/2 + Math.sin(i/count*2*Math.PI)*r;
+    arrows.push({x:cx, y:cy, angle:ang, len: 90});
+  }
+}
+
+function linesIntersect(a,b){
+  // simple line intersection check
+  let x1=a.x, y1=a.y, x2=a.x+Math.cos(a.angle*Math.PI/180)*a.len, y2=a.y+Math.sin(a.angle*Math.PI/180)*a.len;
+  let x3=b.x, y3=b.y, x4=b.x+Math.cos(b.angle*Math.PI/180)*b.len, y4=b.y+Math.sin(b.angle*Math.PI/180)*b.len;
+  function ccw(ax,ay,bx,by,cx,cy){return (cy-ay)*(bx-ax) > (by-ay)*(cx-ax)}
+  // fast bounding box + ccw
+  let det = (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+  if(det==0) return false;
+  let t = ((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/det;
+  let u = -((x1-x2)*(y1-y3)-(y1-y2)*(x1-x3))/det;
+  return t>0.1 && t<1 && u>0.1 && u<1;
+}
+
+function checkWin(){
+  for(let i=0;i<arrows.length;i++){
+    for(let j=i+1;j<arrows.length;j++){
+      if(linesIntersect(arrows[i], arrows[j])) return false;
+    }
+  }
+  return true;
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // draw arrows
+  arrows.forEach((a,idx)=>{
+    let x2 = a.x + Math.cos(a.angle*Math.PI/180)*a.len;
+    let y2 = a.y + Math.sin(a.angle*Math.PI/180)*a.len;
+    ctx.strokeStyle = checkWin()? "#22c55e" : "#ef4444";
+    // if this arrow intersects any, red
+    for(let j=0;j<arrows.length;j++) if(j!=idx && linesIntersect(a,arrows[j])) {ctx.strokeStyle="#ef4444"; break;}
+    if(ctx.strokeStyle!="#ef4444") ctx.strokeStyle="#38bdf8";
+
+    ctx.lineWidth=8; ctx.lineCap="round";
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(x2,y2); ctx.stroke();
+    // arrow head
+    ctx.fillStyle=ctx.strokeStyle;
+    ctx.beginPath();
+    ctx.arc(a.x,8,8,0,Math.PI*2); // tail dot
+    // head triangle
+    let ah = 18;
+    ctx.beginPath();
+    ctx.moveTo(x2,y2);
+    ctx.lineTo(x2 - Math.cos((a.angle-30)*Math.PI/180)*ah, y2 - Math.sin((a.angle-30)*Math.PI/180)*ah);
+    ctx.lineTo(x2 - Math.cos((a.angle+30)*Math.PI/180)*ah, y2 - Math.sin((a.angle+30)*Math.PI/180)*ah);
+    ctx.closePath(); ctx.fill();
+  });
+  if(checkWin() && arrows.length>0){
+    document.getElementById('msg').innerText = "🎉 Level Clear! দারুণ!";
+  }
+  requestAnimationFrame(draw);
+}
+draw();
+
+let selected = -1;
+canvas.addEventListener('pointerdown', e=>{
+  let rect = canvas.getBoundingClientRect();
+  let mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  let best=-1, dist=60;
+  arrows.forEach((a,i)=>{
+    let d = Math.hypot(mx-a.x, my-a.y);
+    if(d<dist){dist=d; best=i}
+  });
+  selected=best;
+});
+canvas.addEventListener('pointermove', e=>{
+  if(selected==-1) return;
+  let rect = canvas.getBoundingClientRect();
+  let mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  let a = arrows[selected];
+  a.angle = Math.atan2(my - a.y, mx - a.x)*180/Math.PI;
+});
+canvas.addEventListener('pointerup', ()=>{
+  if(selected!=-1){moves++; document.getElementById('moves').innerText="Moves: "+moves;}
+  selected=-1;
+  if(checkWin()){ setTimeout(()=>{if(confirm("Level Clear! Next Level?")) nextLevel()},300) }
+});
+
+function nextLevel(){ level++; createLevel(level); }
+createLevel(1);
+</script>
+</body>
+</html>
